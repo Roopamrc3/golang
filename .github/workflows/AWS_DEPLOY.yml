@@ -1,1 +1,42 @@
+name: Docker
 
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
+
+jobs:
+
+    deploy:
+      
+        name: Setup AWS Account
+        runs-on: ubuntu-latest
+        env:
+          IMAGE_NAME: gcr.io/${{ secrets.AWS_PROJECT_ID }}/${{ secrets.AWS_APP_NAME }}
+        steps:
+        
+        - name: Login
+          uses: AWS/github-actions/setup-aws@main
+          with:
+            AWS_PROJECT_ID: ${{ secrets.AWS_PROJECT_ID }}
+            service_account_email: ${{ secrets.AWS_EMAIL }}
+            
+            
+        - name: Configure Docker
+          run: gcloud auth configure-docker --quiet
+            
+        - name: Checkout repository
+          uses: actions/checkout@v2
+
+        - name: Build Docker image
+          run: docker build . -t $IMAGE_NAME 
+
+        - name: Test Docker image
+          run: docker run $IMAGE_NAME sh -c "go test -v" 
+
+        - name: Push Docker image
+          run: docker push $IMAGE_NAME
+
+        - name: Deploy Docker image
+          run: aws run deploy ${{ secrets.AWS_PROJECT_ID }} --image $IMAGE_NAME 
